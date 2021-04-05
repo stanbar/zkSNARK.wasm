@@ -1,0 +1,30 @@
+{
+  "name": "zksnark",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node .",
+    "lint": "eslint .",
+    "pretty": "eslint . --fix --ext .mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stanbar/zkSNARK.js.git"
+  },
+  "author": "stasbar",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/stanbar/zkSNARK.js/issues"
+  },
+  "homepage": "https://github.com/stanbar/zkSNARK.js#readme",
+  "dependencies": {
+    "acorn": "^8.1.0",
+    "console-table-printer": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^14.14.27",
+    "eslint": "^7.23.0",
+    "eslint-config-airbnb-base": "^14.2.1"
+  }
+}
