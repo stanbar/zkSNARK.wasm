@@ -16,11 +16,25 @@ pub fn compile(code: &str) {
     alert(&format!("Compiling, {}!", code));
 }
 
+enum Operand {
+    Number(f64),
+    Identifier(String)
+}
+
+impl fmt::Display for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Operand::Identifier(x) => write!(f, "{}", x),
+            Operand::Number(x) => write!(f, "{}", x),
+        }
+    }
+}
+
 pub struct Operation {
     target: String,
     op: String,
-    left: String,
-    right: String
+    left: Operand,
+    right: Operand
 }
 
 impl fmt::Display for Operation {
@@ -39,42 +53,60 @@ extern {
     fn ask(s: &str) -> String;
 
     // Methods can be from any js namespace.
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: String);
+    #[wasm_bindgen(js_namespace = console, js_name = log)]
+    fn log_unsafe(s: String);
 }
 
+fn log(s: String) {
+    unsafe {
+        log_unsafe(s)
+    }
+}
 
 
 #[wasm_bindgen]
 pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
-    use std::iter;
-    let inputs = input.iter().map(|e| e.as_string().unwrap());
-    let placements: Vec<String> = 
-         iter::once("~one".to_string())
-        .chain(inputs.take(1))
-        .chain(iter::once("~out".to_string()))
-        .collect();
+        use std::iter;
+        let inputs = input.iter().map(|e| e.as_string().unwrap());
+        let placements: Vec<String> = 
+            iter::once("~one".to_string())
+            .chain(inputs.take(1))
+            .chain(iter::once("~out".to_string()))
+            .collect();
 
 
-    placements.iter().for_each(|e| log(e.to_string()));
+        placements.iter().for_each(|e| log(e.to_string()));
 
-    log(String::from("chunking ops"));
-
-
-    let ops: Vec<Operation> = ops.chunks(4)
-        .map(|e| {
-            let left = if e[2].is_string { e[2].as_string } else { e[2].as_f64 }
-            Operation {
-                op: String::from(e[0].as_string().unwrap()),
-                target: String::from(e[1].as_string().unwrap()),
-                left: String::from(e[2].as_string().unwrap()),
-                right: String::from(e[3].as_string().unwrap()),
-            }
-
-        } 
-        ).inspect(|e| log(e.to_string())).collect();
+        log(String::from("chunking ops"));
 
 
+        let ops: Vec<Operation> = ops.chunks(4)
+            .map(|e| {
+                let left = parse_operand(&e[2]);
+                let right = parse_operand(&e[3]);
+
+                Operation {
+                    op: String::from(e[0].as_string().unwrap()),
+                    target: String::from(e[1].as_string().unwrap()),
+                    left,
+                    right,
+                }
+            })
+        .inspect(|e| log(e.to_string()))
+            .collect();
+
+}
+
+fn parse_operand(js_operand: &JsValue) -> Operand {
+    if js_operand.is_null() || js_operand.is_undefined() {
+        panic!("Can not parse null or undefined operand")
+    } else if js_operand.is_function() {
+        panic!("Can not parse function as an operand")
+    } else if js_operand.is_string() {
+        Operand::Identifier(js_operand.as_string().expect("Could not parse operand as string"))
+    } else {
+        Operand::Number(js_operand.as_f64().expect("Could not parse operand as f64"))
+    }
 }
 
 
