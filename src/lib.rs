@@ -66,18 +66,7 @@ fn log(s: String) {
 
 #[wasm_bindgen]
 pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
-        use std::iter;
-        let inputs = input.iter().map(|e| e.as_string().unwrap());
-        let placements: Vec<String> = 
-            iter::once("~one".to_string())
-            .chain(inputs.take(1))
-            .chain(iter::once("~out".to_string()))
-            .collect();
-
-
-        placements.iter().for_each(|e| log(e.to_string()));
-
-        log(String::from("chunking ops"));
+        let inputs: Vec<String> = input.iter().map(|e| e.as_string().unwrap()).collect();
 
 
         let ops: Vec<Operation> = ops.chunks(4)
@@ -95,6 +84,31 @@ pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
         .inspect(|e| log(e.to_string()))
             .collect();
 
+        let placements = get_var_placement(&inputs, ops);
+
+        placements.iter().for_each(|e| log(e.to_string()));
+
+        log(String::from("chunking ops"));
+
+}
+
+/*
+ * Returns the order of variable identificators in following order:
+ * [ ~one, ...inputs, ~out, ...vars ]
+ */
+fn get_var_placement(inputs: &Vec<String>, flatcode: Vec<Operation>) -> Vec<String>{
+    use std::iter;
+    let mut placements: Vec<String> = 
+        iter::once("~one".to_string())
+        .chain(inputs)
+        .chain(iter::once("~out".to_string()))
+        .collect();
+
+    flatcode.iter()
+        .filter(|code| !inputs.contains(&code.target) && code.target != "~out")
+        .for_each(|code| placements.push(code.target));
+
+    return placements
 }
 
 fn parse_operand(js_operand: &JsValue) -> Operand {
