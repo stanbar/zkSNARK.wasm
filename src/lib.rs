@@ -1,46 +1,15 @@
 mod utils;
+mod r1cs;
 
 use std::fmt;
 use wasm_bindgen::prelude::*;
+use r1cs::*;
 
 // // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // // allocator.
 // #[cfg(feature = "wee_alloc")]
 // #[global_allocator]
 // static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-#[derive(Clone)]
-enum Operand {
-    Number(f64),
-    Identifier(String),
-}
-
-impl fmt::Display for Operand {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Identifier(v) => write!(f, "{}", v),
-            Self::Number(v) => write!(f, "{}", v),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Operation {
-    target: String,
-    op: String,
-    left: Operand,
-    right: Operand,
-}
-
-impl fmt::Display for Operation {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{} = {} {} {}",
-            self.target, self.left, self.op, self.right
-        )
-    }
-}
 
 #[wasm_bindgen]
 extern "C" {
@@ -71,7 +40,7 @@ pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
             let right = parse_operand(&e[3]).unwrap();
 
             Operation {
-                op: e[0].as_string().unwrap(),
+                operator: e[0].as_string().unwrap().into(),
                 target: e[1].as_string().unwrap(),
                 left,
                 right,
@@ -80,35 +49,16 @@ pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
         .inspect(|e| log(e.to_string()))
         .collect();
 
-    let placements = get_var_placement(inputs, ops);
+    let placements = get_var_placement(&inputs, &ops);
+    // let (A, B, C) = flatcode_to_r1cs(inputs, ops);
 
     placements.iter().for_each(|e| log(e.to_string()));
 
     log(String::from("chunking ops"));
 }
 
-/// Returns the order of variable identificators in following order:
-/// [ ~one, ...inputs, ~out, ...vars ]
-fn get_var_placement(inputs: Vec<String>, flatcode: Vec<Operation>) -> Vec<String> {
-    use std::iter;
-
-    iter::once("~one".to_string())
-        .chain(inputs.clone())
-        .chain(iter::once("~out".to_string()))
-        .chain(
-            flatcode
-                .iter()
-                .filter(|code| {
-                    let target = &code.target;
-                    !inputs.contains(&target) && target != "~out"
-                })
-                .map(|code| code.target.clone()),
-        )
-        .collect()
-}
-
 #[derive(Debug)]
-enum JsValueType {
+pub enum JsValueType {
     String(String),
     Number(f64),
     Null,
@@ -153,14 +103,16 @@ impl std::fmt::Display for JsValueType {
 
 
 #[derive(Debug)]
-enum Error {
-    InvalidType(JsValueType)
+pub enum Error {
+    InvalidType(JsValueType),
+    OperationTargetNotFound,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::InvalidType(type_name) => write!(f, "invalid type: `{}`", type_name),
+            Self::OperationTargetNotFound => write!(f, "Operation target not found"),
         }
     }
 }
