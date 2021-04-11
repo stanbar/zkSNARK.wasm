@@ -23,10 +23,17 @@ extern "C" {
     // Methods can be from any js namespace.
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     fn log_unsafe(s: String);
+    // Methods can be from any js namespace.
+    #[wasm_bindgen(js_namespace = console, js_name = table)]
+    fn table_unsafe(s: Box<[f64]>);
 }
 
 fn log(s: String) {
     unsafe { log_unsafe(s) }
+}
+
+fn table(table: Vec<f64>) {
+    unsafe { table_unsafe(table.into_boxed_slice()) }
 }
 
 #[wasm_bindgen]
@@ -50,9 +57,13 @@ pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
         .collect();
 
     let placements = get_var_placement(&inputs, &ops);
-    // let (A, B, C) = flatcode_to_r1cs(inputs, ops);
-
     placements.iter().for_each(|e| log(e.to_string()));
+
+    let (a, b, c) = flatcode_to_r1cs(inputs, ops);
+
+    table(a);
+    table(b);
+    table(c);
 
     log(String::from("chunking ops"));
 }
