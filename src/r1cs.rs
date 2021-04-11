@@ -1,5 +1,5 @@
-use std::fmt;
 use super::Error;
+use std::fmt;
 
 #[derive(Clone)]
 pub enum Operator {
@@ -89,11 +89,14 @@ pub fn get_var_placement(inputs: &Vec<String>, flatcode: &Vec<Operation>) -> Vec
         .collect()
 }
 
-pub fn flatcode_to_r1cs(inputs: Vec<String>, flatcode: Vec<Operation>) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+pub fn flatcode_to_r1cs(
+    inputs: Vec<String>,
+    flatcode: Vec<Operation>,
+) -> (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<Vec<f64>>) {
     let varz = get_var_placement(&inputs, &flatcode);
-    let mut a: Vec<f64> = vec![];
-    let mut b: Vec<f64> = vec![];
-    let mut c: Vec<f64> = vec![];
+    let mut a: Vec<Vec<f64>> = vec![];
+    let mut b: Vec<Vec<f64>> = vec![];
+    let mut c: Vec<Vec<f64>> = vec![];
 
     let mut used = std::collections::HashMap::<String, bool>::new();
     inputs.into_iter().for_each(|v| {
@@ -111,20 +114,30 @@ pub fn flatcode_to_r1cs(inputs: Vec<String>, flatcode: Vec<Operation>) -> (Vec<f
             let mut c_temp = vec![0.0; varz.len()];
             used.insert(target.clone(), false);
 
-            let target_index: usize = varz.iter().position(|v| *v == target).ok_or(Error::OperationTargetNotFound).unwrap();
+            let target_index: usize = varz
+                .iter()
+                .position(|v| *v == target)
+                .ok_or(Error::OperationTargetNotFound)
+                .unwrap();
 
             if target == "set" {
                 a_temp[target_index] += 1.0;
                 insert_var(&mut a_temp, &varz, left, &used, true);
                 b_temp[0] = 1.0;
-            } else{
+            } else {
                 match operator {
                     Operator::Plus | Operator::Minus => {
                         c_temp[target_index] = 1.0;
                         insert_var(&mut a_temp, &varz, left, &used, false);
-                        insert_var(&mut a_temp, &varz, right, &used, matches!(operator, Operator::Minus));
+                        insert_var(
+                            &mut a_temp,
+                            &varz,
+                            right,
+                            &used,
+                            matches!(operator, Operator::Minus),
+                        );
                         b_temp[0] = 1.0;
-                    },
+                    }
                     Operator::Multiply => {
                         c_temp[target_index] = 1.0;
                         insert_var(&mut a_temp, &varz, left, &used, false);
@@ -137,31 +150,37 @@ pub fn flatcode_to_r1cs(inputs: Vec<String>, flatcode: Vec<Operation>) -> (Vec<f
                     }
                 }
             }
-            a.append(&mut a_temp);
-            b.append(&mut b_temp);
-            c.append(&mut c_temp);
-
+            a.push(a_temp);
+            b.push(b_temp);
+            c.push(c_temp);
         },
     );
 
-    return (a,b,c)
+    return (a, b, c);
 }
 
 /// Adds a variable or number into one of the vectors; if it's a variable
 /// then the slot associated with that variable is set to 1, and if it's
 /// a number then the slot associated with 1 gets set to that number
-fn insert_var(arr: &mut Vec<f64>, varz: &Vec<String>, variable: Operand, used: &std::collections::HashMap::<String, bool>, reverse: bool){
+fn insert_var(
+    arr: &mut Vec<f64>,
+    varz: &Vec<String>,
+    variable: Operand,
+    used: &std::collections::HashMap<String, bool>,
+    reverse: bool,
+) {
     match variable {
         Operand::Identifier(identifier) => {
             if !used.contains_key(&identifier) {
                 panic!("Using a variable before it is set!")
             }
-            let var_index: usize = varz.iter().position(|v| *v == identifier).ok_or(Error::OperationTargetNotFound).unwrap();
+            let var_index: usize = varz
+                .iter()
+                .position(|v| *v == identifier)
+                .ok_or(Error::OperationTargetNotFound)
+                .unwrap();
             arr[var_index] += if reverse { -1.0 } else { 1.0 }
-        },
-        Operand::Number(value) => {
-            arr[0] += value * if reverse { -1.0 } else { 1.0 }
         }
+        Operand::Number(value) => arr[0] += value * if reverse { -1.0 } else { 1.0 },
     }
-
 }
