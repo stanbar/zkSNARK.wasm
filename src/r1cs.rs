@@ -7,6 +7,7 @@ pub enum Operator {
     Minus,
     Multiply,
     Divide,
+    Set,
 }
 
 impl From<String> for Operator {
@@ -17,6 +18,7 @@ impl From<String> for Operator {
             "-" => Minus,
             "*" => Multiply,
             "/" => Divide,
+            "set" => Set,
             _ => panic!("Unknown operator"),
         }
     }
@@ -30,6 +32,7 @@ impl fmt::Display for Operator {
             Minus => "-",
             Multiply => "*",
             Divide => "/",
+            Set => "set",
         };
 
         write!(f, "{}", sign)
@@ -68,6 +71,7 @@ impl fmt::Display for Operand {
         }
     }
 }
+
 
 /// Returns the order of variable identificators in following order:
 /// [ ~one, ...inputs, ~out, ...vars ]
@@ -120,34 +124,33 @@ pub fn flatcode_to_r1cs(
                 .ok_or(Error::OperationTargetNotFound)
                 .unwrap();
 
-            if target == "set" {
-                a_temp[target_index] += 1.0;
-                insert_var(&mut a_temp, &varz, left, &used, true);
-                b_temp[0] = 1.0;
-            } else {
-                match operator {
-                    Operator::Plus | Operator::Minus => {
-                        c_temp[target_index] = 1.0;
-                        insert_var(&mut a_temp, &varz, left, &used, false);
-                        insert_var(
-                            &mut a_temp,
-                            &varz,
-                            right,
-                            &used,
-                            matches!(operator, Operator::Minus),
-                        );
-                        b_temp[0] = 1.0;
-                    }
-                    Operator::Multiply => {
-                        c_temp[target_index] = 1.0;
-                        insert_var(&mut a_temp, &varz, left, &used, false);
-                        insert_var(&mut b_temp, &varz, right, &used, false);
-                    }
-                    Operator::Divide => {
-                        insert_var(&mut c_temp, &varz, left, &used, false);
-                        a_temp[target_index] = 1.0;
-                        insert_var(&mut b_temp, &varz, right, &used, false);
-                    }
+            match operator {
+                Operator::Set => {
+                    a_temp[target_index] += 1.0;
+                    insert_var(&mut a_temp, &varz, left, &used, true);
+                    b_temp[0] = 1.0;
+                }
+                Operator::Plus | Operator::Minus => {
+                    c_temp[target_index] = 1.0;
+                    insert_var(&mut a_temp, &varz, left, &used, false);
+                    insert_var(
+                        &mut a_temp,
+                        &varz,
+                        right,
+                        &used,
+                        matches!(operator, Operator::Minus),
+                    );
+                    b_temp[0] = 1.0;
+                }
+                Operator::Multiply => {
+                    c_temp[target_index] = 1.0;
+                    insert_var(&mut a_temp, &varz, left, &used, false);
+                    insert_var(&mut b_temp, &varz, right, &used, false);
+                }
+                Operator::Divide => {
+                    insert_var(&mut c_temp, &varz, left, &used, false);
+                    a_temp[target_index] = 1.0;
+                    insert_var(&mut b_temp, &varz, right, &used, false);
                 }
             }
             a.push(a_temp);
@@ -182,5 +185,68 @@ fn insert_var(
             arr[var_index] += if reverse { -1.0 } else { 1.0 }
         }
         Operand::Number(value) => arr[0] += value * if reverse { -1.0 } else { 1.0 },
+    }
+}
+
+// Goes through flattened code and completes the input vector
+pub fn assign_variables(inputs: &Vec<String>, input_vars: &Vec<f64>, flatcode: &Vec<Operation>) -> Vec<f64> {
+    use std::iter;
+    let varz = get_var_placement(inputs, flatcode);
+
+    let mut assignment: Vec<f64> = iter::once(1.0)
+        .chain(input_vars.clone().into_iter())
+        .collect();
+
+
+    flatcode.iter().for_each(|Operation {
+             operator,
+             target,
+             left,
+             right,
+         }| {
+
+            let target_index: usize = varz
+                .iter()
+                .position(|v| v == target)
+                .ok_or(Error::OperationTargetNotFound)
+                .unwrap();
+
+             match operator {
+                 Operator::Set => {
+                     assignment[target_index] = grab_var(&varz, &assignment, left);
+                 }
+                 Operator::Plus => {
+                     assignment[target_index] = grab_var(&varz, &assignment, left) + grab_var(&varz, &assignment, right) 
+                 }
+                 Operator::Minus => {
+                     assignment[target_index] = grab_var(&varz, &assignment, left) - grab_var(&varz, &assignment, right) 
+                 }
+                 Operator::Multiply => {
+                     assignment[target_index] = grab_var(&varz, &assignment, left) * grab_var(&varz, &assignment, right) 
+                 }
+                 Operator::Divide => {
+                     assignment[target_index] = grab_var(&varz, &assignment, left) / grab_var(&varz, &assignment, right) 
+                 }
+             }
+
+    });
+
+    assignment
+}
+
+
+fn grab_var(varz: &Vec<String>, assignment: &Vec<f64>, varr: &Operand) -> f64 {
+    match varr {
+        Operand::Identifier(x) => {
+            let var_index: usize = varz
+                .iter()
+                .position(|v| v == x)
+                .ok_or(Error::OperationTargetNotFound)
+                .unwrap();
+            return assignment[var_index]
+        }
+        Operand::Number(x) => {
+            return x.clone();
+        }
     }
 }

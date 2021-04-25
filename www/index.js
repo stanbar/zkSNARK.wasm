@@ -12,7 +12,7 @@ btnCompile.addEventListener("click", () => {
 
   const operations = flatcode.map(fc => fc.toArray()).flat(1)
 
-  wasm.pass_two_arrays(inputs, operations)
+  wasm.code_to_r1cs(inputs, operations, inputVars)
 
 })
 

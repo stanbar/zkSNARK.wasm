@@ -1,7 +1,9 @@
 mod r1cs;
+mod qap;
 mod utils;
 
 use r1cs::*;
+use qap::*;
 use std::fmt;
 use wasm_bindgen::prelude::*;
 
@@ -53,7 +55,8 @@ fn table2d(table: Vec<Vec<f64>>) {
 }
 
 #[wasm_bindgen]
-pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
+pub fn code_to_r1cs(input: Box<[JsValue]>, ops: Box<[JsValue]>, input_vars: Box<[JsValue]>) {
+    let input_vars: Vec<f64> = input_vars.iter().map(|e| e.as_f64().unwrap()).collect();
     let inputs: Vec<String> = input.iter().map(|e| e.as_string().unwrap()).collect();
 
     let ops: Vec<Operation> = ops
@@ -75,7 +78,8 @@ pub fn pass_two_arrays(input: Box<[JsValue]>, ops: Box<[JsValue]>) {
     let placements = get_var_placement(&inputs, &ops);
     placements.iter().for_each(|e| log(e.to_string()));
 
-    let (a, b, c) = flatcode_to_r1cs(inputs, ops);
+    let (a, b, c) = flatcode_to_r1cs(inputs.clone(), ops.clone());
+    let r = assign_variables(&inputs, &input_vars, &ops);
 
     table2d(a);
     table2d(b);
