@@ -4,6 +4,7 @@ import {parse} from 'acorn';
 // wasm.greet("zk-snark.wasm");
 
 const input = document.getElementById("inCode")
+const args = document.getElementById("arguments")
 
 const btnCompile = document.getElementById("btnCompile")
 btnCompile.addEventListener("click", () => {
@@ -12,8 +13,10 @@ btnCompile.addEventListener("click", () => {
 
   const operations = flatcode.map(fc => fc.toArray()).flat(1)
 
-  wasm.code_to_r1cs(inputs, operations, inputVars)
+  const cleanArgs = args.value.split(",").map(e => Number(e.trim()))
 
+  console.log({operations, cleanArgs})
+  wasm.code_to_r1cs(inputs, operations, cleanArgs)
 })
 
 class Operation{

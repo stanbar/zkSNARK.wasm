@@ -43,10 +43,10 @@ fn table(table: Vec<f64>) {
     unsafe { table_unsafe(table.into_boxed_slice()) }
 }
 
-fn table2d(table: Vec<Vec<f64>>) {
+fn table2d(table: &Vec<Vec<f64>>) {
     unsafe {
         table_2d_unsafe(
-            table
+            table.clone()
                 .into_iter()
                 .map(|e| e.into_iter().map(JsValue::from_f64).collect::<Array>())
                 .collect(),
@@ -81,16 +81,27 @@ pub fn code_to_r1cs(input: Box<[JsValue]>, ops: Box<[JsValue]>, input_vars: Box<
     let (a, b, c) = flatcode_to_r1cs(inputs.clone(), ops.clone());
     let r = assign_variables(&inputs, &input_vars, &ops);
 
-    table2d(a);
-    table2d(b);
-    table2d(c);
+    table2d(&a);
+    table2d(&b);
+    table2d(&c);
 
     
     log(String::from("chunking ops"));
 
-    let (a_p,b_p,c_p,z) = r1cs_to_qap(a,b,c);
-    create_polynomial_solution(r, a_p, b_p, c_p)
+    let (a_p,b_p,c_p,z) = r1cs_to_qap(&a,&b,&c);
 
+    let (a_poly, b_poly, c_poly, sol) = create_solution_polynomials(&r, a_p, b_p, c_p);
+    log("A Poly".to_string());
+    table(a_poly);
+    log("B Poly".to_string());
+    table(b_poly);
+    log("C Poly".to_string());
+    table(c_poly);
+    let (quot, rem) = create_divisor_polynomial(sol, z);
+    log("quot".to_string());
+    table(quot);
+    log("rem".to_string());
+    table(rem);
 }
 
 #[derive(Debug)]

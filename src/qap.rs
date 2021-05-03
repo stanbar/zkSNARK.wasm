@@ -12,8 +12,7 @@ pub fn r1cs_to_qap(
         c.iter().map(lagrange_interop),
     );
 
-    let z = (1..a.len())
-        .fold(vec![1.0], |acc, i| mul_polys(acc, vec![-(i as f64), 1.0]));
+    let z = (1..a.len()).fold(vec![1.0], |acc, i| mul_polys(acc, vec![-(i as f64), 1.0]));
     return (a.collect(), b.collect(), c.collect(), z);
 }
 
@@ -82,26 +81,68 @@ fn mul_polys(a: Vec<f64>, b: Vec<f64>) -> Vec<f64> {
     }
     o
 }
-
-
-pub fn create_solution_polynomials(r: Vec<f64>, a_p: Vec<Vec<f64>>, b_p: Vec<Vec<f64>>, c_p: Vec<Vec<f64>>) -> (Vec<f64>,Vec<f64>, Vec<f64>, Vec<f64>) {
-
-    let a_poly = a_p.into_iter()
+pub fn create_solution_polynomials(
+    r: &Vec<f64>,
+    a_p: Vec<Vec<f64>>,
+    b_p: Vec<Vec<f64>>,
+    c_p: Vec<Vec<f64>>,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+    let a_poly = a_p
+        .into_iter()
         .zip(r.into_iter())
-        .fold(Vec::<f64>::with_capacity(r.len()), |acc, (a, rval)| add_polys(acc, mul_polys(vec![rval], a)) );
+        .fold(Vec::<f64>::with_capacity(r.len()), |acc, (a, rval)| {
+            add_polys(acc, mul_polys(vec![rval.clone()], a))
+        });
 
-    let b_poly = b_p.into_iter()
+    let b_poly = b_p
+        .into_iter()
         .zip(r.into_iter())
-        .fold(Vec::<f64>::with_capacity(r.len()), |acc, (b, rval)| add_polys(acc, mul_polys(vec![rval], b)) );
+        .fold(Vec::<f64>::with_capacity(r.len()), |acc, (b, rval)| {
+            add_polys(acc, mul_polys(vec![rval.clone()], b))
+        });
 
-    let c_poly = c_p.into_iter()
+    let c_poly = c_p
+        .into_iter()
         .zip(r.into_iter())
-        .fold(Vec::<f64>::with_capacity(r.len()), |acc, (c, rval)| add_polys(acc, mul_polys(vec![rval], c)) );
+        .fold(Vec::<f64>::with_capacity(r.len()), |acc, (c, rval)| {
+            add_polys(acc, mul_polys(vec![rval.clone()], c))
+        });
 
-
-    let o = sub_polys(mul_polys(a_poly, b_poly), c_poly);
-    //
+    let o = sub_polys(mul_polys(a_poly.clone(), b_poly.clone()), c_poly.clone());
     // add check
 
     (a_poly, b_poly, c_poly, o)
+}
+
+pub fn create_divisor_polynomial(sol: Vec<f64>, z: Vec<f64>) -> (Vec<f64>, Vec<f64>) {
+    div_polys(sol, z)
+}
+
+// Divide a/b, return quotient and remainder
+fn div_polys(a: Vec<f64>, b: Vec<f64>) -> (Vec<f64>, Vec<f64>) {
+    use std::iter;
+    let b_len = b.len();
+    let mut o = vec![0f64; a.len() - b_len + 1];
+    let mut rem: Vec<f64> = a;
+    let mut leading_fac: f64;
+    let mut pos: usize;
+
+    while rem.len() >= b_len {
+        leading_fac = rem.last().unwrap() / b.last().unwrap();
+        pos = rem.len() - b.len();
+        let field = o.get_mut(pos).unwrap();
+        *field = leading_fac;
+        let multiplied: Vec<f64> = vec![0f64; pos]
+            .into_iter()
+            .chain(iter::once(leading_fac))
+            .collect();
+        let substracted = sub_polys(rem, mul_polys(b.clone(), multiplied));
+        rem = substracted
+            .clone()
+            .into_iter()
+            .take(substracted.clone().len() - 1)
+            .collect();
+    }
+
+    (o, rem)
 }
