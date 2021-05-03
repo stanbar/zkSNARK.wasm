@@ -85,7 +85,12 @@ pub fn code_to_r1cs(input: Box<[JsValue]>, ops: Box<[JsValue]>, input_vars: Box<
     table2d(b);
     table2d(c);
 
+    
     log(String::from("chunking ops"));
+
+    let (a_p,b_p,c_p,z) = r1cs_to_qap(a,b,c);
+    create_polynomial_solution(r, a_p, b_p, c_p)
+
 }
 
 #[derive(Debug)]
